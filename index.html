@@ -172,6 +172,28 @@ select.form-input{cursor:pointer}
 .h-note-rich{width:100%;margin-top:6px;padding-top:8px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text2);line-height:1.6}
 .h-note-rich b,.h-note-rich strong{color:var(--text);font-weight:700}
 .h-note-rich mark{background:rgba(240,192,64,.25);border-radius:2px;padding:0 2px}
+/* NOTE EDIT MODAL */
+.note-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);z-index:700;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease}
+.note-modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:22px;padding:32px 36px;width:min(640px,94vw);max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+.note-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}
+.note-modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:var(--accent);line-height:1}
+.note-modal-meta{font-size:12px;color:var(--text3);margin-top:4px}
+.note-modal-close{background:none;border:1px solid var(--border2);color:var(--text3);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.note-modal-close:hover{border-color:var(--danger);color:var(--danger)}
+.note-modal-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none}
+.note-modal-toolbar button{background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);cursor:pointer;font-size:13px;padding:3px 8px;transition:all .15s;line-height:1.4}
+.note-modal-toolbar button:hover{background:var(--border2);color:var(--text)}
+.note-modal-toolbar .tb-sep{width:1px;background:var(--border);margin:0 4px;align-self:stretch}
+.note-modal-editor{width:100%;min-height:160px;max-height:340px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border2);border-radius:0 0 var(--radius) var(--radius);padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;line-height:1.7;transition:border-color .2s}
+.note-modal-editor:focus{border-color:var(--accent)}
+.note-modal-editor[placeholder]:empty::before{content:attr(placeholder);color:var(--text3);pointer-events:none}
+.note-modal-editor b,.note-modal-editor strong{font-weight:700}
+.note-modal-editor i,.note-modal-editor em{font-style:italic}
+.note-modal-editor u{text-decoration:underline}
+.note-modal-editor ul{padding-left:18px}
+.note-modal-editor ol{padding-left:18px}
+.note-modal-editor mark{background:rgba(240,192,64,.3);border-radius:2px;padding:0 2px}
+.note-modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .pomo-dots{display:flex;gap:6px;justify-content:center;margin-bottom:16px}
 .pomo-dot{width:10px;height:10px;border-radius:50%;background:var(--border2);transition:background .3s}
 .pomo-dot.done{background:var(--accent)}
@@ -1103,16 +1125,26 @@ function renderHistory() {
     const disc=getDisc(s.disciplineId);if(!disc)return;
     const dt=new Date(s.ts);
     const hasNote=s.note&&s.note.replace(/<[^>]*>/g,'').trim().length>0;
-    html+='<div class="history-item" style="flex-wrap:wrap;align-items:flex-start">'+
+    html+='<div class="history-item" style="flex-wrap:wrap;align-items:flex-start" id="hist-'+s.id+'">'+
       '<div class="h-dot" style="background:'+disc.color+';margin-top:3px"></div>'+
       '<div class="h-name">'+disc.name+(s.isPomodoro?' <span style="font-size:10px;color:var(--text3)">🍅</span>':'')+'</div>'+
       '<div class="h-dur">'+fmtSeconds(s.seconds)+'</div>'+
       '<div class="h-date">'+dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</div>'+
-      (hasNote?'<div class="h-note-rich" style="flex-basis:100%">'+s.note+'</div>':'')+
+      '<button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:11px;margin-left:auto" '+
+        'data-session-id="'+s.id+'" data-has-note="'+(hasNote?'1':'0')+'">'+
+        '✏️ '+(hasNote?'Editar':'+ Nota')+'</button>'+
+      (hasNote?'<div class="h-note-rich" style="flex-basis:100%" id="note-display-'+s.id+'">'+s.note+'</div>':
+               '<div class="h-note-rich" style="flex-basis:100%;display:none" id="note-display-'+s.id+'"></div>')+
     '</div>';
   });
   html+='</div></div>';
   wrap.innerHTML=html;
+  // Attach edit button listeners after render (avoids nested-quote hell)
+  wrap.querySelectorAll('button[data-session-id]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      openNoteModal(btn.getAttribute('data-session-id'));
+    });
+  });
 }
 
 /* ── EXPORT NOTES ─────────────────────────────────────────────── */
@@ -1158,6 +1190,75 @@ function exportNotes() {
   const a=document.createElement('a');a.href=url;a.download='anotacoes-qtb-'+today()+'.html';a.click();
   URL.revokeObjectURL(url);
   showToast('📄 '+withNotes.length+' anotações exportadas!');
+}
+
+/* ── NOTE EDIT MODAL ──────────────────────────────────────────── */
+let _editingSessionId = null;
+
+function openNoteModal(sessionId) {
+  const s = state.sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  const disc = getDisc(s.disciplineId);
+  const dt = new Date(s.ts);
+  _editingSessionId = sessionId;
+
+  document.getElementById('note-modal-title').textContent = disc ? disc.name : 'Anotação';
+  document.getElementById('note-modal-meta').textContent =
+    dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) +
+    ' · ' + fmtSeconds(s.seconds);
+
+  const editor = document.getElementById('note-modal-editor');
+  editor.innerHTML = s.note || '';
+  // place cursor at end
+  editor.focus();
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  document.getElementById('note-modal').style.display = 'flex';
+}
+
+function closeNoteModal(e, force) {
+  if(!force && e && e.target !== document.getElementById('note-modal')) return;
+  document.getElementById('note-modal').style.display = 'none';
+  _editingSessionId = null;
+}
+
+function modalNoteCmd(cmd, val) {
+  document.getElementById('note-modal-editor').focus();
+  document.execCommand(cmd, false, val || null);
+}
+
+function saveNoteEdit() {
+  if(!_editingSessionId) return;
+  const editor = document.getElementById('note-modal-editor');
+  const newNote = editor.innerHTML.trim();
+  const s = state.sessions.find(x=>x.id===_editingSessionId);
+  if(!s) return;
+  s.note = newNote;
+  saveState();
+
+  // Update display inline without full re-render
+  const display = document.getElementById('note-display-'+_editingSessionId);
+  const btn = document.querySelector('#hist-'+_editingSessionId+' .btn');
+  const hasNote = newNote.replace(/<[^>]*>/g,'').trim().length > 0;
+  if(display) {
+    display.innerHTML = newNote;
+    display.style.display = hasNote ? '' : 'none';
+  }
+  if(btn) btn.textContent = hasNote ? '✏️ Editar' : '+ Nota';
+
+  // Update header count
+  const withNotes = state.sessions.filter(x=>x.note&&x.note.replace(/<[^>]*>/g,'').trim().length>0);
+  const sub = document.querySelector('#history-wrap .card:first-child div[style*="font-size:13px"]');
+  if(sub) sub.textContent = state.sessions.length+' sessões · '+withNotes.length+' com anotações';
+
+  document.getElementById('note-modal').style.display = 'none';
+  _editingSessionId = null;
+  showToast('Anotação salva!');
 }
 
 /* ── RENDER GAMIFICATION ──────────────────────────────────────── */
@@ -1644,5 +1745,35 @@ window.addEventListener('beforeunload',function(){
 
 init();
 </script>
+<!-- NOTE EDIT MODAL -->
+<div id="note-modal" style="display:none" class="note-modal-overlay" onclick="closeNoteModal(event)">
+  <div class="note-modal-box">
+    <div class="note-modal-header">
+      <div>
+        <div class="note-modal-title" id="note-modal-title">Editar Anotação</div>
+        <div class="note-modal-meta" id="note-modal-meta"></div>
+      </div>
+      <button class="note-modal-close" onclick="closeNoteModal(null,true)">✕</button>
+    </div>
+    <div class="note-modal-toolbar">
+      <button onclick="modalNoteCmd('bold')"><b>B</b></button>
+      <button onclick="modalNoteCmd('italic')"><i>I</i></button>
+      <button onclick="modalNoteCmd('underline')"><u>U</u></button>
+      <button onclick="modalNoteCmd('hiliteColor','rgba(240,192,64,0.35)')">🖊</button>
+      <div class="tb-sep"></div>
+      <button onclick="modalNoteCmd('insertUnorderedList')">• Lista</button>
+      <button onclick="modalNoteCmd('insertOrderedList')">1. Num</button>
+      <div class="tb-sep"></div>
+      <button onclick="modalNoteCmd('removeFormat')">✕ fmt</button>
+    </div>
+    <div class="note-modal-editor" id="note-modal-editor" contenteditable="true"
+         placeholder="Escreva sua anotação aqui..."></div>
+    <div class="note-modal-footer">
+      <button class="btn btn-secondary" onclick="closeNoteModal(null,true)">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveNoteEdit()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
