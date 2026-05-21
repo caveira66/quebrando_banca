@@ -326,8 +326,8 @@ body.light{--bg:#f4f5f7;--bg2:#ffffff;--bg3:#eef0f4;--border:#dde0e8;--border2:#
 
 /* MOBILE BOTTOM NAV */
 .mobile-bottomnav{display:none;position:fixed;bottom:0;left:0;right:0;height:68px;background:var(--bg2);border-top:1px solid var(--border);z-index:200;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0px)}
-.mobile-bottomnav .mbn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text3);font-size:9.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;transition:color .2s;padding:8px 4px;border:none;background:none;-webkit-tap-highlight-color:transparent;position:relative}
-.mobile-bottomnav .mbn-item .mbn-icon{font-size:21px;line-height:1;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.mobile-bottomnav .mbn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--text3);font-size:8.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;transition:color .2s;padding:6px 2px;border:none;background:none;-webkit-tap-highlight-color:transparent;position:relative}
+.mobile-bottomnav .mbn-item .mbn-icon{font-size:19px;line-height:1;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
 .mobile-bottomnav .mbn-item.active{color:var(--accent)}
 .mobile-bottomnav .mbn-item.active .mbn-icon{transform:translateY(-2px) scale(1.15)}
 .mobile-bottomnav .mbn-item:active .mbn-icon{transform:scale(.88)}
@@ -405,6 +405,7 @@ body.light{--bg:#f4f5f7;--bg2:#ffffff;--bg3:#eef0f4;--border:#dde0e8;--border2:#
     <button class="mbn-item active" data-view="today"><span class="mbn-icon">📅</span>Hoje</button>
     <button class="mbn-item" data-view="cycle"><span class="mbn-icon">🗓️</span>Ciclo</button>
     <button class="mbn-item" data-view="dashboard"><span class="mbn-icon">📊</span>Stats</button>
+    <button class="mbn-item" data-view="history"><span class="mbn-icon">🕒</span>Histórico</button>
     <button class="mbn-item" data-view="gamification"><span class="mbn-icon">🏅</span>Troféus</button>
     <button class="mbn-item" data-view="setup"><span class="mbn-icon">⚙️</span>Config</button>
   </nav>
